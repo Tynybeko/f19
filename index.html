@@ -2,44 +2,216 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
-  <style>
-    div {
-      border: 1px solid red;
-      text-align: center;
-      margin: 10px 0;
-      width: 100%;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+        }
 
-    .block {
-      display: flex;
-    }
 
-    .block-item {
-      margin: 0;
-      height: 40px;
-    }
+        .todo_list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
 
-    .red {
-      background-color: red;
-    }
+        }
 
-    .blue {
-      background-color: blue;
-    }
-  </style>
+        .todo_list .item {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            border: 1px solid red;
+            padding: 20px;
+        }
+
+
+        header {
+            display: flex;
+            padding: 10px 5px;
+        }
+
+        header .create_btn {
+            background-color: aquamarine;
+            border: 1px solid green;
+            border-radius: 20px;
+            padding: 5px 10px;
+            cursor: pointer;
+
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.384);
+
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal_inner {
+            padding: 20px;
+            border-radius: 20px;
+            background-color: white;
+        }
+    </style>
 </head>
 
 <body>
-  <div class="block">
-    <div class="block-item red">
+    <header>
+        <button class="create_btn">ADD</button>
+    </header>
+    <div id="create_modal" class="modal">
+        <form class="modal_inner">
+            <label for="title">
+                <p>Title</p>
+                <input type="text" name="title" id="title">
+            </label>
+            <input type="submit">
+        </form>
     </div>
-    <div class="block-item blue">
+    <div class="modal" id="loading">
+        <img src="./yibo-wangyibo.gif" alt="">
     </div>
-  </div>
-  <script src="./test.js"></script>
+    <section class="todo_list">
+
+    </section>
+
+    <script>
+
+    </script>
+    <template id="todo_item_template">
+        <div class="item">
+            <h3>
+                Title
+            </h3>
+            <input type="checkbox" name="" id="">
+        </div>
+    </template>
+
+    <script>
+        const API_URL = `https://696dea0bd7bacd2dd714f614.mockapi.io/api/v1/todo`;
+
+
+        const loadingBlock = document.getElementById('loading')
+        const toggleLoading = (bool) => {
+            if (bool == undefined) {
+                return loadingBlock.classList.toggle('active')
+            }
+            if (bool) {
+                loadingBlock.classList.add('active')
+            } else {
+                loadingBlock.classList.remove('active')
+            }
+        }
+
+        const createModal = document.getElementById('create_modal')
+        const openCreateModal = document.querySelector('header button.create_btn')
+        const createForm = createModal.querySelector('form')
+
+        openCreateModal.addEventListener('click', () => {
+            createModal.classList.add('active')
+        })
+        createForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            toggleLoading(true)
+            const formData = new FormData(createForm)
+            const data = Object.fromEntries(formData.entries())
+            fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+                .then(res => {
+                    if (res.ok) {
+                        return res.json()
+                    }
+                    alert('Error')
+                })
+                .then(data => {
+                    setTemplate(data)
+                    createModal.classList.remove('active')
+                }).finally(() => {
+                    toggleLoading(false)
+                })
+        })
+
+        const todoItemTemplate = document.getElementById(`todo_item_template`);
+        const todoListSection = document.querySelector('section.todo_list')
+
+        const setTemplate = (item) => {
+            const template = todoItemTemplate.content
+            const clone = template.cloneNode(true)
+            clone.querySelector('h3').textContent = item.title
+            const input = clone.querySelector('input')
+            input.checked = item.isCompleted
+            input.setAttribute('data-itemId', item.id)
+            input.addEventListener('change', (e) => {
+                toggleLoading(true)
+                fetch(API_URL + `/${item.id}/`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        isCompleted: e.target.checked
+                    })
+                })
+                    .then(res => {
+                        if (res.ok) {
+                            return res.json()
+                        }
+                        e.target.checked = item.isCompleted
+                    })
+                    .then(data => {
+                        console.log(data);
+                        console.log('CHECKEt');
+                    })
+                    .catch(err => {
+                        console.log(err)
+                        e.target.checked = item.isCompleted
+                    })
+                    .finally(() => {
+                        toggleLoading(false)
+                    })
+            })
+            todoListSection.append(clone)
+        }
+        const setTodoList = (data) => {
+            for (let item of data) {
+                setTemplate(item)
+            }
+        }
+
+        async function getTodoList() {
+            try {
+                toggleLoading(true)
+                const response = await fetch(API_URL);
+                if (response.ok) {
+                    const data = await response.json();
+                    setTodoList(data)
+                }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                toggleLoading(false)
+            }
+        }
+        getTodoList()
+    </script>
 </body>
 
 </html>
